@@ -5,6 +5,9 @@ using UnityEngine;
 
 public class InGradient : MonoBehaviour {
 
+    public LeanTweenType easeType;
+    public float speed = 0.4f;
+
     private Vector3 upJoint;
     private Vector3 rightJoint;
     private Vector3 downJoint;
@@ -12,6 +15,9 @@ public class InGradient : MonoBehaviour {
 
     public bool isFlippedHorizontal = false;
     public bool isFlippedVertical = false;
+
+    [SerializeField]
+    private GameObject _rotatePivot = null;
 
     private void Awake() {
         SwipeHandler.onSwiped += OnSwiped;
@@ -38,31 +44,51 @@ public class InGradient : MonoBehaviour {
     }
 
     private void OnSwiped(SwipeHandler.Direction direction) {
-        if (direction == SwipeHandler.Direction.None) {
+        if (direction == SwipeHandler.Direction.None || IsAnyTweenActive()) {
             return;
         }
 
         switch (direction) {
             case SwipeHandler.Direction.Up:
-                transform.RotateAround(upJoint, Vector3.right, 180);
-                isFlippedVertical = !isFlippedVertical;
+                LeanAnimation(upJoint, Vector3.right, 180, true);
                 break;
             case SwipeHandler.Direction.Down:
-                transform.RotateAround(downJoint, Vector3.right, 180);
-                isFlippedVertical = !isFlippedVertical;
+                LeanAnimation(downJoint, Vector3.right, -180, true);
                 break;
             case SwipeHandler.Direction.Right:
-                transform.RotateAround(rightJoint, Vector3.forward, -180);
-                isFlippedHorizontal = !isFlippedHorizontal;
+                LeanAnimation(rightJoint, Vector3.forward, -180, false);
                 break;
             case SwipeHandler.Direction.Left:
-                transform.RotateAround(leftJoint, Vector3.forward, 180);
-                isFlippedHorizontal = !isFlippedHorizontal;
+                LeanAnimation(leftJoint, Vector3.forward, 180, false);
                 break;
         }
-
-        CalculateJoints();
     }
+
+    private bool IsAnyTweenActive() {
+        return LeanTween.isTweening(_rotatePivot);
+    }
+
+    private void LeanAnimation(Vector3 joint, Vector3 axis, float angle, bool isVertical) {
+        _rotatePivot.transform.position = joint;
+        _rotatePivot.transform.eulerAngles = Vector3.zero;
+
+        transform.SetParent(_rotatePivot.transform);
+
+        LeanTween.rotateAroundLocal(_rotatePivot, axis, angle, speed)
+            .setEase(easeType)
+            .setOnComplete(() => {
+                transform.SetParent(null);
+
+                if (isVertical) {
+                    isFlippedVertical = !isFlippedVertical;
+                } else {
+                    isFlippedHorizontal = !isFlippedHorizontal;
+                }
+
+                CalculateJoints();
+            });
+    }
+
 
     private void OnDrawGizmos() {
         Gizmos.color = Color.red;
