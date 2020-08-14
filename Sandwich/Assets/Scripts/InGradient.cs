@@ -43,8 +43,8 @@ public class InGradient : MonoBehaviour {
         }
     }
 
-    private void OnSwiped(SwipeHandler.Direction direction) {
-        if (direction == SwipeHandler.Direction.None || IsAnyTweenActive()) {
+    private void OnSwiped(SwipeHandler.Direction direction, GameObject selectedObject) {
+        if (direction == SwipeHandler.Direction.None || IsAnyTweenActive() || IsItMe(selectedObject) == false) {
             return;
         }
 
@@ -62,6 +62,10 @@ public class InGradient : MonoBehaviour {
                 LeanAnimation(leftJoint, Vector3.forward, 180, false);
                 break;
         }
+    }
+
+    private bool IsItMe(GameObject gameObject) {
+        return this.gameObject == gameObject ? true : false;
     }
 
     private bool IsAnyTweenActive() {

@@ -4,7 +4,8 @@ using UnityEngine.EventSystems;
 
 public class SwipeHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler {
 
-    public static Action<Direction> onSwiped;
+    public static Action<Direction, GameObject> onSwiped;
+    public LayerMask layerMask;
 
     public enum Direction {
         None,
@@ -16,14 +17,32 @@ public class SwipeHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, IEnd
 
     public void OnBeginDrag(PointerEventData eventData) {
         Direction direction = GetDirection(eventData.delta);
-        Debug.Log("SWIPED TO: " + direction);
 
-        onSwiped?.Invoke(GetDirection(eventData.delta));
+        GameObject selectedGameObject = SelectGameObject();
+        if (selectedGameObject == null) {
+            return;
+        }
+
+        onSwiped?.Invoke(GetDirection(eventData.delta), selectedGameObject);
+        Debug.Log("SWIPED TO: " + direction);
     }
+
     public void OnDrag(PointerEventData eventData) {
     }
 
     public void OnEndDrag(PointerEventData eventData) {
+    }
+
+    private GameObject SelectGameObject() {
+        RaycastHit hit;
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+
+        if (Physics.Raycast(ray, out hit, Mathf.Infinity, layerMask)) {
+            Transform objectHit = hit.transform;
+
+            return objectHit.gameObject;
+        }
+        return null;
     }
 
     private Direction GetDirection(Vector2 delta) {
