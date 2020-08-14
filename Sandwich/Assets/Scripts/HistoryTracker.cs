@@ -9,7 +9,6 @@ public class HistoryTracker : MonoBehaviour {
 
     public void Undo() {
         if (hasUndoFinished) {
-            hasUndoFinished = false;
             (inGradients.Pop() as InGradient).Undo();
         }
     }

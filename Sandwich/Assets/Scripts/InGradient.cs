@@ -201,6 +201,8 @@ public class InGradient : MonoBehaviour {
     public void Undo() {
         Debug.Log("Undo: " + this.gameObject);
 
+        HistoryTracker.hasUndoFinished = false;
+
         switch (_lastDirection) {
             case SwipeHandler.Direction.Up:
                 LeanAnimation(_downJoint, Vector3.right, -180, true, _lastStackedAmount, true);
