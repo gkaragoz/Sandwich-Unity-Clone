@@ -1,15 +1,20 @@
-﻿using UnityEngine;
+﻿using System;
+using System.Collections.Generic;
+using UnityEngine;
 
 public class InGradient : MonoBehaviour {
 
     [Header("Initiailizations")]
     public LeanTweenType easeType;
     public float speed = 0.4f;
+    public LayerMask layerMask;
 
     [SerializeField]
     private GameObject _rotatePivot = null;
 
     [Header("DEBUG")]
+    [SerializeField]
+    private List<InGradient> _inGradients = new List<InGradient>();
     [SerializeField]
     private bool _isFlippedHorizontal = false;
     [SerializeField]
@@ -21,17 +26,33 @@ public class InGradient : MonoBehaviour {
     private Vector3 _leftJoint;
 
     private float _inGradientHeight = 0.25f;
+    private InGradient _neighbourInGradient;
+
+    public List<InGradient> GetStackedInGradients() {
+        return _inGradients;
+    }
 
     private void Awake() {
-        _inGradientHeight = this.transform.localScale.y * 0.5f;
+        SwipeHandler.onSwiped += OnSwiped;
+
+        _inGradients.Add(this);
+
+        _inGradientHeight = transform.localScale.y * 0.5f;
 
         CalculateJoints();
     }
-
-    public void Move(SwipeHandler.Direction direction, int stackedAmount) {
-        if (direction == SwipeHandler.Direction.None || IsAnyTweenActive()) {
+    
+    private void OnSwiped(SwipeHandler.Direction direction, GameObject swipedObject) {
+        if (direction == SwipeHandler.Direction.None || IsItMe(swipedObject) == false || IsAnyTweenActive()) {
             return;
         }
+
+        _neighbourInGradient = HasNeighbour(direction);
+        if (_neighbourInGradient == null) {
+            return;
+        } 
+
+        int stackedAmount = _neighbourInGradient.GetStackedInGradients().Count;
 
         switch (direction) {
             case SwipeHandler.Direction.Up:
@@ -47,6 +68,39 @@ public class InGradient : MonoBehaviour {
                 LeanAnimation(_leftJoint, Vector3.forward, 180, false, stackedAmount);
                 break;
         }
+    }
+
+    private InGradient HasNeighbour(SwipeHandler.Direction direction) {
+        RaycastHit hitInfo;
+        Ray upRay = new Ray(transform.position, Vector3.forward);
+        Ray rightRay = new Ray(transform.position, Vector3.right);
+        Ray downRay = new Ray(transform.position, Vector3.back);
+        Ray leftRay = new Ray(transform.position, Vector3.left);
+
+        switch (direction) {
+            case SwipeHandler.Direction.Up:
+                if (Physics.Raycast(upRay, out hitInfo, transform.localScale.z, layerMask)) {
+                    return hitInfo.transform.gameObject.GetComponent<InGradient>();
+                }
+                break;
+            case SwipeHandler.Direction.Right:
+                if (Physics.Raycast(rightRay, out hitInfo, transform.localScale.x, layerMask)) {
+                    return hitInfo.transform.gameObject.GetComponent<InGradient>();
+                }
+                break;
+            case SwipeHandler.Direction.Down:
+                if (Physics.Raycast(downRay, out hitInfo, transform.localScale.z, layerMask)) {
+                    return hitInfo.transform.gameObject.GetComponent<InGradient>();
+                }
+                break;
+            case SwipeHandler.Direction.Left:
+                if (Physics.Raycast(leftRay, out hitInfo, transform.localScale.x, layerMask)) {
+                    return hitInfo.transform.gameObject.GetComponent<InGradient>();
+                }
+                break;
+        }
+
+        return null;
     }
 
     private void CalculateJoints() {
@@ -68,11 +122,15 @@ public class InGradient : MonoBehaviour {
     }
 
     private float GetTargetHeight(int stackedAmount) {
-        return _inGradientHeight * stackedAmount;
+        return _inGradientHeight * (stackedAmount + this._inGradients.Count - 1);
     }
 
     private bool IsAnyTweenActive() {
         return LeanTween.isTweening(_rotatePivot);
+    }
+
+    private bool IsItMe(GameObject targetGameObject) {
+        return this.gameObject == targetGameObject ? true : false;
     }
 
     private void LeanAnimation(Vector3 joint, Vector3 axis, float angle, bool isVertical, int stackedAmount) {
@@ -84,7 +142,8 @@ public class InGradient : MonoBehaviour {
         LeanTween.rotateAroundLocal(_rotatePivot, axis, angle, speed)
             .setEase(easeType)
             .setOnComplete(() => {
-                transform.SetParent(null);
+                transform.SetParent(_neighbourInGradient.transform);
+                this.GetComponent<Collider>().enabled = false;
 
                 if (isVertical) {
                     _isFlippedVertical = !_isFlippedVertical;
@@ -93,9 +152,14 @@ public class InGradient : MonoBehaviour {
                 }
 
                 CalculateJoints();
+
+                _neighbourInGradient.AddInGradient(this);
             });
     }
 
+    private void AddInGradient(InGradient inGradient) {
+        this._inGradients.AddRange(inGradient.GetStackedInGradients());
+    }
 
     private void OnDrawGizmos() {
         Gizmos.color = Color.red;
