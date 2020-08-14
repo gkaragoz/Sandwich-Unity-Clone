@@ -8,6 +8,7 @@ public class InGradient : MonoBehaviour {
     public LeanTweenType easeType;
     public float speed = 0.4f;
     public LayerMask layerMask;
+    public InGradientType type;
 
     [SerializeField]
     private GameObject _rotatePivot = null;
@@ -27,6 +28,16 @@ public class InGradient : MonoBehaviour {
 
     private float _inGradientHeight = 0.25f;
     private InGradient _neighbourInGradient;
+
+    public enum InGradientType {
+        Bread,
+        Cheese,
+        Meat,
+        Pickle,
+        Tomatoe
+    }
+
+    public int MovementCount { get; private set; }
 
     public List<InGradient> GetStackedInGradients() {
         return _inGradients;
@@ -152,6 +163,8 @@ public class InGradient : MonoBehaviour {
                 }
 
                 CalculateJoints();
+
+                MovementCount++;
 
                 _neighbourInGradient.AddInGradient(this);
             });
