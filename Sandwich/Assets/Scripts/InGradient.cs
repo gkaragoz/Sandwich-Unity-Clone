@@ -20,6 +20,11 @@ public class InGradient : MonoBehaviour {
     private bool _isFlippedHorizontal = false;
     [SerializeField]
     private bool _isFlippedVertical = false;
+    [SerializeField]
+    private SwipeHandler.Direction _lastDirection;
+    [SerializeField]
+    private int _lastStackedAmount;
+
 
     private Vector3 _upJoint;
     private Vector3 _rightJoint;
@@ -27,7 +32,7 @@ public class InGradient : MonoBehaviour {
     private Vector3 _leftJoint;
 
     private float _inGradientHeight = 0.25f;
-    private InGradient _neighbourInGradient;
+    private InGradient _lastNeighbourInGradient;
 
     public enum InGradientType {
         Bread,
@@ -58,25 +63,26 @@ public class InGradient : MonoBehaviour {
             return;
         }
 
-        _neighbourInGradient = HasNeighbour(direction);
-        if (_neighbourInGradient == null) {
+        _lastNeighbourInGradient = HasNeighbour(direction);
+        if (_lastNeighbourInGradient == null) {
             return;
-        } 
+        }
 
-        int stackedAmount = _neighbourInGradient.GetStackedInGradients().Count;
+        _lastStackedAmount = _lastNeighbourInGradient.GetStackedInGradients().Count;
+        _lastDirection = direction;
 
-        switch (direction) {
+        switch (_lastDirection) {
             case SwipeHandler.Direction.Up:
-                LeanAnimation(_upJoint, Vector3.right, 180, true, stackedAmount);
+                LeanAnimation(_upJoint, Vector3.right, 180, true, _lastStackedAmount, false);
                 break;
             case SwipeHandler.Direction.Down:
-                LeanAnimation(_downJoint, Vector3.right, -180, true, stackedAmount);
+                LeanAnimation(_downJoint, Vector3.right, -180, true, _lastStackedAmount, false);
                 break;
             case SwipeHandler.Direction.Right:
-                LeanAnimation(_rightJoint, Vector3.forward, -180, false, stackedAmount);
+                LeanAnimation(_rightJoint, Vector3.forward, -180, false, _lastStackedAmount, false);
                 break;
             case SwipeHandler.Direction.Left:
-                LeanAnimation(_leftJoint, Vector3.forward, 180, false, stackedAmount);
+                LeanAnimation(_leftJoint, Vector3.forward, 180, false, _lastStackedAmount, false);
                 break;
         }
     }
@@ -144,8 +150,12 @@ public class InGradient : MonoBehaviour {
         return this.gameObject == targetGameObject ? true : false;
     }
 
-    private void LeanAnimation(Vector3 joint, Vector3 axis, float angle, bool isVertical, int stackedAmount) {
-        _rotatePivot.transform.position = joint + (Vector3.up * GetTargetHeight(stackedAmount));
+    private void LeanAnimation(Vector3 joint, Vector3 axis, float angle, bool isVertical, int stackedAmount, bool reversed) {
+        if (reversed == false) {
+            _rotatePivot.transform.position = joint + (Vector3.up * GetTargetHeight(stackedAmount));
+        } else {
+            _rotatePivot.transform.position = joint - (Vector3.up * GetTargetHeight(stackedAmount));
+        }
         _rotatePivot.transform.eulerAngles = Vector3.zero;
 
         transform.SetParent(_rotatePivot.transform);
@@ -153,8 +163,15 @@ public class InGradient : MonoBehaviour {
         LeanTween.rotateAroundLocal(_rotatePivot, axis, angle, speed)
             .setEase(easeType)
             .setOnComplete(() => {
-                transform.SetParent(_neighbourInGradient.transform);
-                this.GetComponent<Collider>().enabled = false;
+                if (reversed == false)
+                    transform.SetParent(_lastNeighbourInGradient.transform);
+                else
+                    transform.SetParent(null);
+
+                if (reversed == false)
+                    this.GetComponent<Collider>().enabled = false;
+                else
+                    this.GetComponent<Collider>().enabled = true;
 
                 if (isVertical) {
                     _isFlippedVertical = !_isFlippedVertical;
@@ -164,14 +181,50 @@ public class InGradient : MonoBehaviour {
 
                 CalculateJoints();
 
-                MovementCount++;
+                if (reversed == false)
+                    MovementCount++;
+                else
+                    MovementCount--;
 
-                _neighbourInGradient.AddInGradient(this);
+                if (reversed == false)
+                    _lastNeighbourInGradient.AddInGradient(this);
+                else
+                    _lastNeighbourInGradient.RemoveInGradient(this);
+
+                if (reversed == false)
+                    HistoryTracker.inGradients.Push(this);
+                else
+                    HistoryTracker.hasUndoFinished = true;
             });
+    }
+
+    public void Undo() {
+        Debug.Log("Undo: " + this.gameObject);
+
+        switch (_lastDirection) {
+            case SwipeHandler.Direction.Up:
+                LeanAnimation(_downJoint, Vector3.right, -180, true, _lastStackedAmount, true);
+                break;
+            case SwipeHandler.Direction.Down:
+                LeanAnimation(_upJoint, Vector3.right, 180, true, _lastStackedAmount, true);
+                break;
+            case SwipeHandler.Direction.Right:
+                LeanAnimation(_leftJoint, Vector3.forward, 180, false, _lastStackedAmount, true);
+                break;
+            case SwipeHandler.Direction.Left:
+                LeanAnimation(_rightJoint, Vector3.forward, -180, false, _lastStackedAmount, true);
+                break;
+        }
     }
 
     private void AddInGradient(InGradient inGradient) {
         this._inGradients.AddRange(inGradient.GetStackedInGradients());
+    }
+
+    private void RemoveInGradient(InGradient inGradient) {
+        foreach (var item in inGradient.GetStackedInGradients()) {
+            this._inGradients.Remove(item);
+        }
     }
 
     private void OnDrawGizmos() {
